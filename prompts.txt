@@ -1,0 +1,6 @@
+1. i'm doing a project called "adsb based aircraft tracking system using rtl-sdr"
+this project uses an rtl-sdr (software defined radio) to receive adsb signals broadcasted by an aeroplane. this data is captured and it's iq samples saved to a .bin file. 
+i need to get the number of adsb signals in the bin file latitude longitude and altitude data from each adsb signals. 
+please refer the file "iq_samples_20251019_180842_675.bin" in the directory "..\adsb_misc\iq_samples\" and tell me what you interpretted from this, also give me the structure of a typical adsb signal
+also tell me what you understood from this prompt
+
