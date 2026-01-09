@@ -4,3 +4,19 @@ i need to get the number of adsb signals in the bin file latitude longitude and 
 please refer the file "iq_samples_20251019_180842_675.bin" in the directory "..\adsb_misc\iq_samples\" and tell me what you interpretted from this, also give me the structure of a typical adsb signal
 also tell me what you understood from this prompt
 
+2. thanks, now i want to run the decoder code to output a json file in the format
+[
+ { lat1, lon1, alt1,
+   lat2, lon2, alt2, 
+   ....
+ }
+]
+when i run the command 
+    <decoder program name> <input binary file name> <output json file name>
+into the terminal
+
+3. i want to save the json files to a directory "position_json" and also the json files should have the lat, lon, alt of a particular entry in the same line as opposed to right now where it's split into 3 lines
+for eg: if there's 3 entries (each with it's respective lat lon alt), then i want each entry in 1 line, so a total of 3 lines only but right now, it's 9 lines in total
+
+4. now i want to get the output position data (lat, lon, alt) into a CSV format with suitable headings. 
+this file should be structured similar to the current output JSON file. 

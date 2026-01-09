@@ -9,5 +9,6 @@ __pycache__/
 
 # Logs and temp
 *.log
-temp.txt
 decoded_output.txt
+scratchpad.txt
+

@@ -15,6 +15,10 @@ FRAME_LEN_SAMPLES = FULL_MSG_LEN_US * SAMPLES_PER_US
 # CRC Generator Polynomial for Mode S (0xFFFA0480)
 GENERATOR_POLY = 0xFFFA0480
 
+# the command to run the program should be in this format:
+# python src/adsb_decoder.py "iq_samples\iq_samples_20251019_180842_675.bin" .csv
+# where the first argument is the path to the iq_samples file 
+# and the second argument is the required file type (eg: .csv or .json)
 def read_iq_samples(filepath):
     """
     Reads raw IQ samples from a binary file.
@@ -492,40 +496,71 @@ def main():
         else:
              print(f"{sig['icao']:<10} | {sig['alt']:<10} | {'Partial':<10} | {'Partial':<10} | {sig['raw']}")
              
-    # JSON output if requested
+    # Output data if requested
     if len(sys.argv) >= 3:
-        filename = sys.argv[2]
-        import json
+        # User argument is ignored for naming, used only for extension detection
+        arg_filename = sys.argv[2]
         
-        # Create directory if needed relative to script
+        # Get current time
+        from datetime import datetime
+        now = datetime.now()
+        date_str = now.strftime("%Y%m%d")
+        time_str = now.strftime("%H%M")
+        
+        # Determine extension
+        ext = ".json"
+        if arg_filename.lower().endswith(".csv"):
+            ext = ".csv"
+            
+        # Create directory structure: output/YYYYMMDD/
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
-        output_dir = os.path.join(project_root, "output")
         
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            
-        output_path = os.path.join(output_dir, filename)
+        # Base output folder
+        base_output_dir = os.path.join(project_root, "output")
         
-        json_output = []
-        for sig in valid_signals:
-            entry = {
-                "lat": sig['lat'],
-                "lon": sig['lon'],
-                "alt": sig['alt']
-            }
-            json_output.append(entry)
+        # Date specific folder
+        date_output_dir = os.path.join(base_output_dir, date_str)
+        
+        if not os.path.exists(date_output_dir):
+            os.makedirs(date_output_dir)
             
-        # Custom compact writing: one object per line
-        with open(output_path, 'w') as f:
-            f.write("[\n")
-            lines = []
-            for item in json_output:
-                lines.append("    " + json.dumps(item))
-            f.write(",\n".join(lines))
-            f.write("\n]")
+        # Final Filename: outputHHMM.ext
+        final_filename = f"output{time_str}{ext}"
+        output_path = os.path.join(date_output_dir, final_filename)
+        
+        # Detect format by extension
+        if ext == ".csv":
+            import csv
+            with open(output_path, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(["lat", "lon", "alt"]) # Header
+                for sig in valid_signals:
+                     writer.writerow([sig['lat'], sig['lon'], sig['alt']])
+            print(f"\nCSV output saved to {output_path}")
             
-        print(f"\nJSON output saved to {output_path}")
+        else:
+            # Default to JSON
+            import json
+            json_output = []
+            for sig in valid_signals:
+                entry = {
+                    "lat": sig['lat'],
+                    "lon": sig['lon'],
+                    "alt": sig['alt']
+                }
+                json_output.append(entry)
+                
+            # Custom compact writing: one object per line
+            with open(output_path, 'w') as f:
+                f.write("[\n")
+                lines = []
+                for item in json_output:
+                    lines.append("    " + json.dumps(item))
+                f.write(",\n".join(lines))
+                f.write("\n]")
+                
+            print(f"\nJSON output saved to {output_path}")
     else:
         # Default behavior: save to text file as before (or just keep valid_signals printing)
         pass
