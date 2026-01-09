@@ -412,14 +412,14 @@ def parse_df17(hex_msg, detected_signals):
                 aircraft_messsages[icao]['even'] = (lat_enc, lon_enc) # Store even CPR message
             else:
                 aircraft_messsages[icao]['odd'] = (lat_enc, lon_enc) # Store odd CPR message
-            
+
             # Try to decode CPR message
             lat, lon = 0.0, 0.0
             if 'even' in aircraft_messsages[icao] and 'odd' in aircraft_messsages[icao]:
                 res = cpr_decode(aircraft_messsages[icao]['even'], aircraft_messsages[icao]['odd']) # Decoded CPR message (lat, lon)
                 if res:
                     lat, lon = res # Update lat, lon
-                    
+
             detected_signals.append({
                 "icao": hex(icao),
                 "type": "Airborne Position",
@@ -429,161 +429,183 @@ def parse_df17(hex_msg, detected_signals):
                 "raw": hex_msg
             })
 
-    except Exception as e:
-        # print(e)
+    except Exception:
         pass
 
+def process_signals(magnitude, threshold):
+    """
+    Processes the magnitude data to detect preambles, decode bits, and parse DF17 messages.
+    Returns a list of decoded signal dictionaries.
+    """
+    start_indices = detect_preamble(magnitude, threshold=threshold)
+    print(f"Detected {len(start_indices)} potential preambles.")
+    
+    valid_signals = []
+
+    for idx in start_indices:
+        bits = decode_bits(magnitude, idx)
+        if not bits:
+            continue
+
+        # Note: CRC check is skipped for now.
+        # To enable, use: 
+        # if not check_crc(bits): continue
+
+        hex_msg = bits_to_hex_str(bits)
+        # print(f"DEBUG: Valid CRC at {idx}: {hex_msg}")
+        parse_df17(hex_msg, valid_signals)
+
+    return valid_signals
+
+def display_signals(valid_signals):
+    """
+    Prints a formatted table of the decoded aircraft signals to the console.
+    """
+    print(f"\nTotal Valid ADS-B Signals: {len(valid_signals)}")
+    print("-" * 60)
+    print(f"{'ICAO':<10} | {'ALT (ft)':<10} | {'LAT':<10} | {'LON':<10} | {'RAW'}")
+    print("-" * 60)
+
+    for sig in valid_signals:
+        icao_str = sig['icao']
+        alt_str = str(sig['alt'])
+        if sig['lat'] != 0.0:
+            lat_str = str(sig['lat'])
+            lon_str = str(sig['lon'])
+        else:
+            lat_str = "Partial"
+            lon_str = "Partial"
+
+        print(f"{icao_str:<10} | {alt_str:<10} | {lat_str:<10} | {lon_str:<10} | {sig['raw']}")
+
+def save_output(valid_signals, arg_filename, date_str, time_str):
+    """
+    Saves the decoded signals to either CSV or JSON based on the user's preference and mode selection.
+    Supports both Auto-Timestamp (Option 1) and Manual/Batch Path (Option 2).
+    """
+    # Determine extension
+    ext = ".json"
+    if arg_filename.lower().endswith(".csv"):
+        ext = ".csv"
+
+    # ==========================================
+    # OPTION 1: Auto-Timestamp (DEFAULT)
+    # ******************************************
+    # Create directory structure: output/YYYYMMDD/
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+
+    # Base output folder
+    base_output_dir = os.path.join(project_root, "output")
+
+    # Date specific folder
+    date_output_dir = os.path.join(base_output_dir, date_str)
+
+    if not os.path.exists(date_output_dir):
+        os.makedirs(date_output_dir)
+
+    # Final Filename: outputHHMM.ext
+    # Example: output1230.csv
+    final_filename = f"output{time_str}{ext}"
+    output_path = os.path.join(date_output_dir, final_filename)
+    # ==========================================
+
+    # ==========================================
+    # OPTION 2: Manual / Batch Output (UNCOMMENT TO USE)
+    # ******************************************
+    # output_path = arg_filename
+    # # Create parent directory if it doesn't exist
+    # output_dir = os.path.dirname(output_path)
+    # if output_dir and not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
+    # ==========================================
+
+    # Detect format by extension
+    if ext == ".csv":
+        import csv
+        with open(output_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(["lat", "lon", "alt", "icao"]) # Header
+            for sig in valid_signals:
+                 # We write all entries; KML converter handles skipping partials later
+                 writer.writerow([sig['lat'], sig['lon'], sig['alt'], sig['icao']])
+        print(f"\nCSV output saved to {output_path}")
+
+    else:
+        # Default to JSON
+        import json
+        json_output = []
+        for sig in valid_signals:
+            entry = {
+                "lat": sig['lat'],
+                "lon": sig['lon'],
+                "alt": sig['alt'],
+                "icao": sig['icao']
+            }
+            json_output.append(entry)
+
+        # Custom compact writing: one object per line for better readability
+        with open(output_path, 'w') as f:
+            f.write("[\n")
+            lines = []
+            for item in json_output:
+                lines.append("    " + json.dumps(item))
+            f.write(",\n".join(lines))
+            f.write("\n]")
+
+        print(f"\nJSON output saved to {output_path}")
+
 def main():
-    # comment to use command line args
-    # will give dynamic filepath
+    # --- Input Selection ---
+    # Option A: Use command line arguments (Default)
     if len(sys.argv) < 2:
-        print("Usage: python adsb_decoder.py <iq_file>")
+        print("Usage: python adsb_decoder.py <iq_file> <output_hint>")
+        print("Example: python adsb_decoder.py \"iq_samples/data.bin\" .csv")
         return
     filepath = sys.argv[1]
 
-    # uncomment to use fixed input file
+    # Option B: Use a hardcoded fixed input file (Uncomment to use)
     # filepath = "./iq_samples/iq_samples_20251019_172049_619.bin"
 
     if not os.path.exists(filepath):
         print(f"File not found: {filepath}")
         return
 
+    # --- Load Data ---
     print("Reading IQ samples...")
     magnitude = read_iq_samples(filepath)
     if magnitude is None:
         return
-        
+
     print(f"Loaded {len(magnitude)} samples.")
-    
-    # Estimate noise floor
+
+    # --- Preamble Detection Config ---
+    # Estimate noise floor to set threshold dynamically
     avg_mag = np.mean(magnitude)
     print(f"Average Magnitude: {avg_mag:.2f}")
-    threshold = avg_mag * 5 
+    threshold = avg_mag * 5
     print(f"Using Threshold: {threshold:.2f}")
 
+    # --- Signal Processing ---
     print("Detecting preambles/signals...")
-    
-    start_indices = detect_preamble(magnitude, threshold=threshold) 
-    print(f"Detected {len(start_indices)} potential preambles.")
-    
-    valid_signals = []
-    
-    for idx in start_indices:
-        bits = decode_bits(magnitude, idx)
-        if not bits: 
-            # print(f"Index {idx}: failed bit decode")
-            continue
-        
-        # Check CRC
-        # if check_crc(bits):
-        hex_msg = bits_to_hex_str(bits)
-        # print(f"DEBUG: Valid CRC at {idx}: {hex_msg}")
-        parse_df17(hex_msg, valid_signals)
-        
-        # else:
-        #      if len(valid_signals) == 0 and idx < 1000000: # Limit debug spew
-        #          hex_msg = bits_to_hex_str(bits)
-        #          print(f"DEBUG: Invalid CRC at {idx}: {hex_msg} (First few bits: {bits[:10]})")
-            
-    print(f"\nTotal Valid ADS-B Signals: {len(valid_signals)}")
-    print("-" * 60)
-    print(f"{'ICAO':<10} | {'ALT (ft)':<10} | {'LAT':<10} | {'LON':<10} | {'RAW'}")
-    print("-" * 60)
-    
-    print(f"\nTotal Valid ADS-B Signals: {len(valid_signals)}")
-    print("-" * 60)
-    print(f"{'ICAO':<10} | {'ALT (ft)':<10} | {'LAT':<10} | {'LON':<10} | {'RAW'}")
-    print("-" * 60)
-    
-    # Text output
-    for sig in valid_signals:
-        if sig['lat'] != 0.0:
-            print(f"{sig['icao']:<10} | {sig['alt']:<10} | {sig['lat']:<10} | {sig['lon']:<10} | {sig['raw']}")
-        else:
-             print(f"{sig['icao']:<10} | {sig['alt']:<10} | {'Partial':<10} | {'Partial':<10} | {sig['raw']}")
-             
-    # Output data if requested
+    valid_signals = process_signals(magnitude, threshold)
+
+    # --- Display Results ---
+    display_signals(valid_signals)
+
+    # --- Handle File Output ---
     if len(sys.argv) >= 3:
-        # User argument is ignored for naming, used only for extension detection
-        arg_filename = sys.argv[2]
-        
-        # Get current time
+        arg_filename = sys.argv[2] # .csv or .json hint
+
+        # Get current time for Option 1 naming
         from datetime import datetime
         now = datetime.now()
         date_str = now.strftime("%Y%m%d")
         time_str = now.strftime("%H%M")
-        
-        # Determine extension
-        ext = ".json"
-        if arg_filename.lower().endswith(".csv"):
-            ext = ".csv"
 
-        # ==========================================
-        # OPTION 1: Auto-Timestamp (DEFAULT)
-        # ******************************************
-        # Create directory structure: output/YYYYMMDD/
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(script_dir)
-        
-        # Base output folder
-        base_output_dir = os.path.join(project_root, "output")
-        
-        # Date specific folder
-        date_output_dir = os.path.join(base_output_dir, date_str)
-        
-        if not os.path.exists(date_output_dir):
-            os.makedirs(date_output_dir)
-            
-        # Final Filename: outputHHMM.ext
-        final_filename = f"output{time_str}{ext}"
-        output_path = os.path.join(date_output_dir, final_filename)
-        # ==========================================
-
-        # ==========================================
-        # OPTION 2: Manual / Batch Output (UNCOMMENT TO USE)
-        # ******************************************
-        # output_path = arg_filename
-        # # Create parent directory if it doesn't exist
-        # output_dir = os.path.dirname(output_path)
-        # if output_dir and not os.path.exists(output_dir):
-        #     os.makedirs(output_dir)
-        # ==========================================
-        
-        # Detect format by extension
-        if ext == ".csv":
-            import csv
-            with open(output_path, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(["lat", "lon", "alt"]) # Header
-                for sig in valid_signals:
-                     writer.writerow([sig['lat'], sig['lon'], sig['alt']])
-            print(f"\nCSV output saved to {output_path}")
-            
-        else:
-            # Default to JSON
-            import json
-            json_output = []
-            for sig in valid_signals:
-                entry = {
-                    "lat": sig['lat'],
-                    "lon": sig['lon'],
-                    "alt": sig['alt']
-                }
-                json_output.append(entry)
-                
-            # Custom compact writing: one object per line
-            with open(output_path, 'w') as f:
-                f.write("[\n")
-                lines = []
-                for item in json_output:
-                    lines.append("    " + json.dumps(item))
-                f.write(",\n".join(lines))
-                f.write("\n]")
-                
-            print(f"\nJSON output saved to {output_path}")
+        save_output(valid_signals, arg_filename, date_str, time_str)
     else:
-        # Default behavior: save to text file as before (or just keep valid_signals printing)
-        pass
+        print("\nNo output file requested. Use '.csv' or '.json' as the second argument to save results.")
 
 if __name__ == "__main__":
     main()
