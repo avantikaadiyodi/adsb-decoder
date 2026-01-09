@@ -1,0 +1,15 @@
+Hex    Flight   Altitude  Speed   Lat       Lon       Track  Messages Seen   .
+--------------------------------------------------------------------------------
+4d24e4 SVA821   2450      275     8.430     76.815    121   19        0 sec
+
+Hex    Flight   Altitude  Speed   Lat       Lon       Track  Messages Seen   .
+--------------------------------------------------------------------------------
+4d24e4 SVA821   2425      275     8.428     76.817    121   29        0 sec
+
+Hex    Flight   Altitude  Speed   Lat       Lon       Track  Messages Seen   .
+--------------------------------------------------------------------------------
+4d24e4 SVA821   2350      275     8.426     76.821    121   41        0 sec
+
+Hex    Flight   Altitude  Speed   Lat       Lon       Track  Messages Seen .  
+--------------------------------------------------------------------------------
+4d24e4 SVA821   2300      275     8.425     76.824    121   57        0 sec
