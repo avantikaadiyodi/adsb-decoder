@@ -6,6 +6,8 @@
 iq_samples/
 output/
 __pycache__/
+pos_plot_data/
+
 
 # Logs and temp
 *.log
