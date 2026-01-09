@@ -131,12 +131,13 @@ def decode_bits(magnitude, start_idx):
         if offset + 1 >= len(magnitude):
             return None
         
-        sample1 = magnitude[offset]
-        sample2 = magnitude[offset+1]
+        sample1 = magnitude[offset] # Signal in first half
+        sample2 = magnitude[offset+1] # Signal in second half
         
-        if sample1 > sample2:
+        # compares the signal and check which is stronger. the stronger signal implies a pulse there
+        if sample1 > sample2: # Pulse in first half
             bits.append(1)
-        elif sample1 < sample2:
+        elif sample1 < sample2: # Pulse in second half
             bits.append(0)
         else:
             # If equal, ambiguous. Usually means weak signal.
@@ -352,9 +353,9 @@ def parse_df17(hex_msg, detected_signals):
         df = int(b[0:5], 2)
         if df != 17: return
         
-        icao = int(b[8:32], 2)
-        data = b[32:88]
-        tc = int(data[0:5], 2)
+        icao = int(b[8:32], 2) # ICAO address is stored in 9th bit to 32nd bit (indices 8 to 31)
+        data = b[32:88] # message data is stored in 33rd bit to 88th bit (indices 32 to 87)
+        tc = int(data[0:5], 2) # Type code is stored in 33rd bit to 37th bit (indices 0 to 4)
         
         # Altitude (TC 9-18 or 20-22)
         # Position (TC 9-18)
@@ -367,57 +368,57 @@ def parse_df17(hex_msg, detected_signals):
             # Bit 40-51 -> Altitude
             
             # Extract altitude
-            # Q bit is bit 47 (index 47-32 = 15 inside data?)
+            # Q bit is bit 47 (index 47-32 = 15 inside data?); decides if altitude is in 25ft or 100ft steps
             # data is 56 bits. 
             # TC: 5 bits (0-4)
             # SS: 2 bits (5-6)
             # SAF: 1 bit (7)
             # ALT: 12 bits (8-19) -> Wait, layout varies.
             
-            # Standard DF17 Airborne Pos:
-            # TC: 5
-            # Surveillance Status: 2
-            # NICsb: 1
+            # Standard DF17 Airborne Pos: 
+            # TC: 5 bits (0-4)
+            # Surveillance Status: 2 bits (5-6)
+            # NICsb: 1 bit (7)
             # Altitude: 12 (Bits 40-51 of message, or index 8-19 of data)
-            # Time (T): 1
-            # CPR Format (F): 1
-            # CPR Lat: 17
-            # CPR Lon: 17
+            # Time (T): 1 bit (8)
+            # CPR Format (F): 1 bit (9)
+            # CPR Lat: 17 bits (10-26)
+            # CPR Lon: 17 bits (27-42)
             
-            alt_bits = data[8:20]
+            alt_bits = data[8:20] # Altitude is stored in 8th bit to 20th bit (indices 8 to 19)
             q_bit = alt_bits[7] # 8th bit of altitude field
             
             # Simple 25ft or 100ft decode
             # If Q=1, 25ft steps.
-            raw_alt = int(alt_bits, 2)
+            raw_alt = int(alt_bits, 2) # converts the string from base-2 into base-10 integer
             # remove Q bit
-            val = ((raw_alt >> 5) << 4) | (raw_alt & 0xF) 
+            val = ((raw_alt >> 5) << 4) | (raw_alt & 0xF) # shifts the bits to the right by 5 positions and then left by 4 positions and then applies a bitwise AND operation with 0xF (binary 1111) to extract the last 4 bits
             altitude = 0
             if q_bit == '1':
                 altitude = val * 25 - 1000
+            # If Q=0, 100ft steps. Gillham code?
             else:
-                # Gillham code? Or 100ft. usually 100ft if Q=0
                 altitude = val * 100 - 1000 # Approximation
             
             f_flag = int(data[21], 2) # CPR Format
-            lat_enc = int(data[22:39], 2)
-            lon_enc = int(data[39:56], 2)
+            lat_enc = int(data[22:39], 2) # Latitude encoded value
+            lon_enc = int(data[39:56], 2) # Longitude encoded value 
             
             # Store for CPR global decode
             if icao not in aircraft_messsages:
                 aircraft_messsages[icao] = {}
             
             if f_flag == 0:
-                aircraft_messsages[icao]['even'] = (lat_enc, lon_enc)
+                aircraft_messsages[icao]['even'] = (lat_enc, lon_enc) # Store even CPR message
             else:
-                aircraft_messsages[icao]['odd'] = (lat_enc, lon_enc)
+                aircraft_messsages[icao]['odd'] = (lat_enc, lon_enc) # Store odd CPR message
             
-            # Try decode
+            # Try to decode CPR message
             lat, lon = 0.0, 0.0
             if 'even' in aircraft_messsages[icao] and 'odd' in aircraft_messsages[icao]:
-                res = cpr_decode(aircraft_messsages[icao]['even'], aircraft_messsages[icao]['odd'])
+                res = cpr_decode(aircraft_messsages[icao]['even'], aircraft_messsages[icao]['odd']) # Decoded CPR message (lat, lon)
                 if res:
-                    lat, lon = res
+                    lat, lon = res # Update lat, lon
                     
             detected_signals.append({
                 "icao": hex(icao),
@@ -433,11 +434,16 @@ def parse_df17(hex_msg, detected_signals):
         pass
 
 def main():
+    # comment to use command line args
+    # will give dynamic filepath
     if len(sys.argv) < 2:
         print("Usage: python adsb_decoder.py <iq_file>")
         return
-
     filepath = sys.argv[1]
+
+    # uncomment to use fixed input file
+    # filepath = "./iq_samples/iq_samples_20251019_172049_619.bin"
+
     if not os.path.exists(filepath):
         print(f"File not found: {filepath}")
         return
@@ -452,7 +458,7 @@ def main():
     # Estimate noise floor
     avg_mag = np.mean(magnitude)
     print(f"Average Magnitude: {avg_mag:.2f}")
-    threshold = avg_mag * 5 # Try dynamic threshold
+    threshold = avg_mag * 5 
     print(f"Using Threshold: {threshold:.2f}")
 
     print("Detecting preambles/signals...")
@@ -511,7 +517,10 @@ def main():
         ext = ".json"
         if arg_filename.lower().endswith(".csv"):
             ext = ".csv"
-            
+
+        # ==========================================
+        # OPTION 1: Auto-Timestamp (DEFAULT)
+        # ******************************************
         # Create directory structure: output/YYYYMMDD/
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
@@ -528,6 +537,17 @@ def main():
         # Final Filename: outputHHMM.ext
         final_filename = f"output{time_str}{ext}"
         output_path = os.path.join(date_output_dir, final_filename)
+        # ==========================================
+
+        # ==========================================
+        # OPTION 2: Manual / Batch Output (UNCOMMENT TO USE)
+        # ******************************************
+        # output_path = arg_filename
+        # # Create parent directory if it doesn't exist
+        # output_dir = os.path.dirname(output_path)
+        # if output_dir and not os.path.exists(output_dir):
+        #     os.makedirs(output_dir)
+        # ==========================================
         
         # Detect format by extension
         if ext == ".csv":
