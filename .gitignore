@@ -1,0 +1,13 @@
+# Binary files
+*.bin
+*.dat
+
+# Directories
+iq_samples/
+output/
+__pycache__/
+
+# Logs and temp
+*.log
+temp.txt
+decoded_output.txt
