@@ -4,10 +4,14 @@
 
 # Directories
 iq_samples/
-output/
 __pycache__/
+
+# output directories
+pos_plot_data/
+output/
 
 # Logs and temp
 *.log
-temp.txt
 decoded_output.txt
+scratchpad.txt
+
