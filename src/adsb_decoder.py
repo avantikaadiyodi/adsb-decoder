@@ -466,12 +466,13 @@ def display_signals(valid_signals):
     print(f"{'ICAO':<10} | {'ALT (ft)':<10} | {'LAT':<10} | {'LON':<10} | {'RAW'}")
     print("-" * 60)
 
-    for sig in valid_signals:
-        icao_str = sig['icao']
-        alt_str = str(sig['alt'])
+    # to process each position
+    for sig in valid_signals: # to take each signal from valid_signals
+        icao_str = sig['icao'] 
+        alt_str = str(sig['alt']) #
         if sig['lat'] != 0.0:
-            lat_str = str(sig['lat'])
-            lon_str = str(sig['lon'])
+            lat_str = str(sig['lat']) # to obtain latitude
+            lon_str = str(sig['lon']) # 
         else:
             lat_str = "Partial"
             lon_str = "Partial"
