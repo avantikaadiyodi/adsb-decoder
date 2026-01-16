@@ -4,6 +4,8 @@
 
 # Directories
 iq_samples/
+frames_adsb/
+dump_raw/
 __pycache__/
 
 # output directories
