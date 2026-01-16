@@ -11,6 +11,7 @@ __pycache__/
 # output directories
 pos_plot_data/
 output/
+graphs_out/
 
 # Logs and temp
 *.log
