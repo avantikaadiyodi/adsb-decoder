@@ -445,7 +445,7 @@ Examples:
                     csv = mm['best_match']['csv_pos']
                     diff = mm['best_match']
                     print(f"    CSV: ICAO={csv['icao']}, Lat={csv['lat']:.5f}, Lon={csv['lon']:.5f}, Alt={csv['alt']}")
-                    print(f"    DIFF: ΔLat={diff['d_lat']:.5f}, ΔLon={diff['d_lon']:.5f}, ΔAlt={diff['d_alt']}")
+                    print(f"    DIFF: dLat={diff['d_lat']:.5f}, dLon={diff['d_lon']:.5f}, dAlt={diff['d_alt']}")
                 else:
                     print(f"    CSV: No match found")
     
