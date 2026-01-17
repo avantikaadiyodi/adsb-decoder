@@ -7,6 +7,7 @@ iq_samples/
 frames_adsb/
 dump_raw/
 __pycache__/
+ignore_folder/
 
 # output directories
 pos_plot_data/
@@ -15,6 +16,3 @@ graphs_out/
 
 # Logs and temp
 *.log
-decoded_output.txt
-scratchpad.txt
-project_summary.txt
